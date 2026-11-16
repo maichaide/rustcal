@@ -1,8 +1,11 @@
 # RustCal v0.3
 
-基于 **Rust + egui + SQLite** 开发的跨平台现代 GUI 日历与任务管理软件，完整复刻 `calcurse` 核心能力并扩展现代日历生态。
+基于 **Rust + egui + SQLite** 开发的跨平台现代 GUI 日历与任务管理软件，完整复刻 `calcurse` 核心能力并扩展现代日历生态。感谢 Calcurse 启发，一直在Termux 和 Linux下使用 calcurse 管理日程
 ## 软件界面
 ![rustcal 运行界面](assets/rustcal01.png)
+
+可以自定义颜色
+
 ![rustcal 运行界面](assets/rustcal02.png)
 
 ## v0.3 核心修复与升级
