@@ -1,0 +1,19 @@
+[package]
+name = "rust_cal"
+version = "0.3.0"
+edition = "2021"
+description = "A modern cross-platform GUI replacement for calcurse built with Rust and egui."
+
+[dependencies]
+eframe = "0.29.1"
+egui = "0.29.1"
+rusqlite = { version = "0.32.1", features = ["bundled"] }
+chrono = { version = "0.4.38", features = ["serde"] }
+uuid = { version = "1.11.0", features = ["v4", "serde"] }
+serde = { version = "1.0.214", features = ["derive"] }
+serde_json = "1.0.132"
+rfd = "0.15.0"
+directories = "5.0.1"
+anyhow = "1.0.93"
+encoding_rs = "0.8.35"
+chardetng = "0.1.17"
