@@ -1,6 +1,8 @@
 # RustCal v0.3
 
 基于 **Rust + egui + SQLite** 开发的跨平台现代 GUI 日历与任务管理软件，完整复刻 `calcurse` 核心能力并扩展现代日历生态。感谢 Calcurse 启发，一直在Termux 和 Linux下使用 calcurse 管理日程
+支持统信Linux，具体见release的uoslinux包
+
 ## 软件界面
 ![rustcal 运行界面](assets/rustcal01.png)
 
@@ -28,6 +30,7 @@
 - 支持导入、导出与全量备份至本地sqlite数据库，支持JSON 格式备份与恢复
 - 支持云端同步，支持 CalDAV、WebDAV 协议
 - 所有处理在本机完成
+  
 ## 编译运行
 ```bash
 cargo build --release
