@@ -17,3 +17,5 @@ directories = "5.0.1"
 anyhow = "1.0.93"
 encoding_rs = "0.8.35"
 chardetng = "0.1.17"
+ureq = "2.10"
+

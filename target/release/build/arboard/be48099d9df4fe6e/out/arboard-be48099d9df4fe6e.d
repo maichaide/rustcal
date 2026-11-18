@@ -1,0 +1,11 @@
+/home/xyz/Downloads/rustcal/target/release/build/arboard/be48099d9df4fe6e/out/arboard-be48099d9df4fe6e.d: /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/lib.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/common.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/platform/mod.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/platform/linux/mod.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/platform/linux/x11.rs
+
+/home/xyz/Downloads/rustcal/target/release/build/arboard/be48099d9df4fe6e/out/libarboard-be48099d9df4fe6e.rlib: /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/lib.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/common.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/platform/mod.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/platform/linux/mod.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/platform/linux/x11.rs
+
+/home/xyz/Downloads/rustcal/target/release/build/arboard/be48099d9df4fe6e/out/libarboard-be48099d9df4fe6e.rmeta: /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/lib.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/common.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/platform/mod.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/platform/linux/mod.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/platform/linux/x11.rs
+
+/home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/lib.rs:
+/home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/common.rs:
+/home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/platform/mod.rs:
+/home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/platform/linux/mod.rs:
+/home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/arboard-3.7.0/src/platform/linux/x11.rs:

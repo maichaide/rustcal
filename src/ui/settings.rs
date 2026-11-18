@@ -135,19 +135,22 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
                 }
             }
 
-		if ui.button("📤 导出为 .ics (UTF-8 标准)").clicked() {
-			if let Some(path) = rfd::FileDialog::new()
-				.set_file_name("rustcal_export.ics")
-				.save_file()
-			{
-				let content = ical::export_to_ics(&app.events, &app.todos);
-				// 【关键修复】：显式以 UTF-8 字节流写入文件，避免受 Windows 本地 ANSI/GBK 编码影响
-				match std::fs::write(&path, content.as_bytes()) {
-					Ok(_) => app.status_message = format!("✅ 已成功导出 UTF-8 ICS 至 {}", path.display()),
-					Err(e) => app.status_message = format!("❌ 导出失败: {}", e),
-				}
-			}
-		}
+            if ui.button("📤 导出为 .ics (UTF-8 标准)").clicked() {
+                if let Some(path) = rfd::FileDialog::new()
+                    .set_file_name("rustcal_export.ics")
+                    .save_file()
+                {
+                    let content = ical::export_to_ics(&app.events, &app.todos);
+                    // 【关键修复】：显式以 UTF-8 字节流写入文件，避免受 Windows 本地 ANSI/GBK 编码影响
+                    match std::fs::write(&path, content.as_bytes()) {
+                        Ok(_) => {
+                            app.status_message =
+                                format!("✅ 已成功导出 UTF-8 ICS 至 {}", path.display())
+                        }
+                        Err(e) => app.status_message = format!("❌ 导出失败: {}", e),
+                    }
+                }
+            }
         });
 
         ui.add_space(6.0);
@@ -185,7 +188,7 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
         });
 
         ui.separator();
-        ui.heading(RichText::new("☁ 云端日历同步与协作 (CalDAV / Google / Outlook / WebDAV)").color(fg_color));
+        ui.heading(RichText::new("☁ 云端日历同步与协作（CalDAV和WebDAV）").color(fg_color));
 
         egui::Grid::new("sync_account_grid")
             .num_columns(2)
@@ -195,7 +198,7 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
                 egui::ComboBox::from_id_salt("sync_provider_combo")
                     .selected_text(&app.sync_config.provider)
                     .show_ui(ui, |ui| {
-                        for p in ["CalDAV", "Google Calendar", "Microsoft Graph", "WebDAV"] {
+                        for p in ["CalDAV", "WebDAV"] {
                             ui.selectable_value(&mut app.sync_config.provider, p.into(), p);
                         }
                     });
@@ -220,20 +223,30 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.button("🔌 测试连接").clicked() {
                 match SyncEngine::test_connection(&app.sync_config) {
-                    Ok(msg) => app.status_message = msg,
-                    Err(e) => app.status_message = format!("❌ {}", e),
+                    Ok(msg) => {
+                        app.status_message = format!("✅ 连接成功：{}", msg);
+                    }
+                    Err(e) => {
+                        app.status_message = format!("❌ 连接失败：{}", e);
+                    }
                 }
             }
             if ui.button("🔄 立即同步所有已启用日历").clicked() {
-                let mut logs = Vec::new();
-                for cal in &app.calendars {
-                    if cal.is_visible {
-                        if let Ok(m) = SyncEngine::sync_calendar(cal) {
-                            logs.push(m);
-                        }
+                match SyncEngine::sync_all(
+                    &app.sync_config,
+                    &mut app.db,
+                    &app.calendars,
+                    &app.events,
+                    &app.todos,
+                ) {
+                    Ok(summary) => {
+                        app.reload_all();
+                        app.status_message = format!("✅ 同步成功：{}", summary);
+                    }
+                    Err(e) => {
+                        app.status_message = format!("❌ 同步失败：{}", e);
                     }
                 }
-                app.status_message = logs.join(" | ");
             }
         });
 
@@ -267,10 +280,15 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
 
         if !app.status_message.is_empty() {
             ui.add_space(10.0);
+            let msg_color = if app.status_message.starts_with('❌') {
+                Color32::from_rgb(220, 38, 38)
+            } else {
+                Color32::from_rgb(5, 150, 105)
+            };
             ui.label(
                 RichText::new(&app.status_message)
                     .strong()
-                    .color(Color32::from_rgb(5, 150, 105)),
+                    .color(msg_color),
             );
         }
     });

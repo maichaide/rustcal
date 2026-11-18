@@ -1,0 +1,12 @@
+/home/xyz/Downloads/rustcal/target/release/build/zeroize/3f8e83b4d2052fa9/out/zeroize-3f8e83b4d2052fa9.d: /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/lib.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/aarch64.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/barrier.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/bulk.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/stack.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/../README.md
+
+/home/xyz/Downloads/rustcal/target/release/build/zeroize/3f8e83b4d2052fa9/out/libzeroize-3f8e83b4d2052fa9.rlib: /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/lib.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/aarch64.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/barrier.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/bulk.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/stack.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/../README.md
+
+/home/xyz/Downloads/rustcal/target/release/build/zeroize/3f8e83b4d2052fa9/out/libzeroize-3f8e83b4d2052fa9.rmeta: /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/lib.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/aarch64.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/barrier.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/bulk.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/stack.rs /home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/../README.md
+
+/home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/lib.rs:
+/home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/aarch64.rs:
+/home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/barrier.rs:
+/home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/bulk.rs:
+/home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/stack.rs:
+/home/xyz/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zeroize-1.9.2/src/../README.md:
