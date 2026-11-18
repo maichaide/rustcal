@@ -36,5 +36,5 @@ jobs:
         with:
           name: macos-binaries
           path: |
-            target/aarch64-apple-darwin/release/rustcal
-            target/x86_64-apple-darwin/release/rustcal
+            target/aarch64-apple-darwin/release/rust_cal
+            target/x86_64-apple-darwin/release/rust_cal
