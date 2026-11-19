@@ -2830,6 +2830,7 @@ dependencies = [
  "eframe",
  "egui",
  "encoding_rs",
+ "quick-xml 0.41.0",
  "rfd",
  "rusqlite",
  "serde",

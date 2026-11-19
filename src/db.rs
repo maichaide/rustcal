@@ -2,7 +2,7 @@ use crate::models::{Calendar, Event, EventUrgency, Recurrence, Todo};
 use anyhow::Result;
 use chrono::{NaiveDate, NaiveDateTime};
 use directories::ProjectDirs;
-use rusqlite::{params, Connection};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::path::PathBuf;
 use uuid::Uuid;
 
@@ -80,6 +80,22 @@ impl Database {
                 due_date TEXT,
                 FOREIGN KEY (calendar_id) REFERENCES calendars(id) ON DELETE CASCADE
             );
+
+            -- One durable sync baseline per configured CalDAV collection. The baseline
+            -- is what lets us distinguish an intentional deletion from an item that
+            -- has never been synchronized.
+            CREATE TABLE IF NOT EXISTS caldav_sync_state (
+                state_key TEXT PRIMARY KEY,
+                state_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
+
+            -- Explicit local deletions must survive after the row itself is removed.
+            -- The key format is E:<uid> for VEVENT and T:<uid> for VTODO.
+            CREATE TABLE IF NOT EXISTS caldav_tombstones (
+                item_key TEXT PRIMARY KEY,
+                deleted_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            );
             ",
         )?;
 
@@ -154,6 +170,29 @@ impl Database {
                 due_date: Some(today),
             })?;
         }
+        Ok(())
+    }
+
+
+    /// Read the durable CalDAV synchronization baseline for an account/calendar.
+    pub fn get_caldav_sync_state(&self, key: &str) -> Result<Option<String>> {
+        let value = self.conn.query_row(
+            "SELECT state_json FROM caldav_sync_state WHERE state_key = ?1",
+            params![key],
+            |row| row.get::<_, String>(0),
+        ).optional()?;
+        Ok(value)
+    }
+
+    /// Atomically replace the durable CalDAV synchronization baseline.
+    pub fn set_caldav_sync_state(&self, key: &str, json: &str) -> Result<()> {
+        self.conn.execute(
+            "INSERT INTO caldav_sync_state(state_key, state_json, updated_at)
+             VALUES (?1, ?2, CURRENT_TIMESTAMP)
+             ON CONFLICT(state_key) DO UPDATE SET
+               state_json=excluded.state_json, updated_at=CURRENT_TIMESTAMP",
+            params![key, json],
+        )?;
         Ok(())
     }
 
@@ -290,6 +329,7 @@ impl Database {
                 ev.urgency.as_str(),
             ],
         )?;
+        self.conn.execute("DELETE FROM caldav_tombstones WHERE item_key = ?1", params![format!("E:{}", ev.id)])?;
         Ok(())
     }
 
@@ -375,6 +415,7 @@ impl Database {
                     ev.reminder_minutes,
                     ev.urgency.as_str(),
                 ])?;
+                tx.execute("DELETE FROM caldav_tombstones WHERE item_key=?1", params![format!("E:{}", ev.id)])?;
                 done += 1;
                 if done % 50 == 0 || done == total {
                     on_progress(done, total);
@@ -405,6 +446,7 @@ impl Database {
                     if todo.completed { 1 } else { 0 },
                     due_str,
                 ])?;
+                tx.execute("DELETE FROM caldav_tombstones WHERE item_key=?1", params![format!("T:{}", todo.id)])?;
                 done += 1;
                 if done % 50 == 0 || done == total {
                     on_progress(done, total);
@@ -417,10 +459,20 @@ impl Database {
         Ok(())
     }
 
+    /// User initiated deletion: persist a tombstone before removing the row.
     pub fn delete_event(&self, id: &str) -> Result<()> {
-        self.conn
-            .execute("DELETE FROM events WHERE id = ?1", params![id])?;
+        self.conn.execute(
+            "INSERT INTO caldav_tombstones(item_key) VALUES (?1) ON CONFLICT(item_key) DO UPDATE SET deleted_at=CURRENT_TIMESTAMP",
+            params![format!("E:{}", id)],
+        )?;
+        self.conn.execute("DELETE FROM events WHERE id = ?1", params![id])?;
         Ok(())
+    }
+
+    /// Deletion caused by a successful remote sync must not create a local tombstone.
+    pub fn delete_event_from_sync(&self, id: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM events WHERE id = ?1", params![id])?;
+        self.clear_caldav_tombstone(&format!("E:{}", id))
     }
 
     // --- Todos ---
@@ -472,12 +524,42 @@ impl Database {
                 due_str,
             ],
         )?;
+        self.conn.execute("DELETE FROM caldav_tombstones WHERE item_key = ?1", params![format!("T:{}", todo.id)])?;
         Ok(())
     }
 
+    /// User initiated deletion: persist a tombstone before removing the row.
     pub fn delete_todo(&self, id: &str) -> Result<()> {
-        self.conn
-            .execute("DELETE FROM todos WHERE id = ?1", params![id])?;
+        self.conn.execute(
+            "INSERT INTO caldav_tombstones(item_key) VALUES (?1) ON CONFLICT(item_key) DO UPDATE SET deleted_at=CURRENT_TIMESTAMP",
+            params![format!("T:{}", id)],
+        )?;
+        self.conn.execute("DELETE FROM todos WHERE id = ?1", params![id])?;
+        Ok(())
+    }
+
+    pub fn delete_todo_from_sync(&self, id: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM todos WHERE id = ?1", params![id])?;
+        self.clear_caldav_tombstone(&format!("T:{}", id))
+    }
+
+    pub fn list_caldav_tombstones(&self) -> Result<Vec<String>> {
+        let mut stmt = self.conn.prepare("SELECT item_key FROM caldav_tombstones ORDER BY deleted_at")?;
+        let rows = stmt.query_map([], |row| row.get(0))?;
+        let mut out = Vec::new();
+        for row in rows { out.push(row?); }
+        Ok(out)
+    }
+
+    pub fn has_caldav_tombstone(&self, item_key: &str) -> Result<bool> {
+        let exists: Option<i64> = self.conn.query_row(
+            "SELECT 1 FROM caldav_tombstones WHERE item_key=?1", params![item_key], |row| row.get(0)
+        ).optional()?;
+        Ok(exists.is_some())
+    }
+
+    pub fn clear_caldav_tombstone(&self, item_key: &str) -> Result<()> {
+        self.conn.execute("DELETE FROM caldav_tombstones WHERE item_key=?1", params![item_key])?;
         Ok(())
     }
 }

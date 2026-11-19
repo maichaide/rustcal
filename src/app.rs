@@ -1,6 +1,6 @@
 use crate::db::Database;
 use crate::models::{Calendar, Event, ThemeConfig, Todo};
-use crate::sync::caldav::SyncAccountConfig;
+use crate::sync::caldav::{SyncAccountConfig, SyncEngine, SyncMode};
 use crate::sync::ical;
 use crate::ui::{
     calendar_grid,
@@ -11,6 +11,7 @@ use chrono::{Duration, Local, NaiveDate};
 use eframe::egui::{self, Color32, Key, RichText};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use std::time::Duration as StdDuration;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum MainTab {
@@ -43,6 +44,13 @@ pub struct ImportProgressState {
     pub finished_message: Option<String>,
 }
 
+#[derive(Debug, Clone)]
+pub struct SyncProgressState {
+    pub active: bool,
+    pub stage: String,
+    pub finished_message: Option<String>,
+}
+
 pub struct RustCalApp {
     pub db: Database,
     pub calendars: Vec<Calendar>,
@@ -65,8 +73,10 @@ pub struct RustCalApp {
 
     pub theme: ThemeConfig,
     pub sync_config: SyncAccountConfig,
+    pub sync_mode: SyncMode,
     pub status_message: String,
     pub import_state: Arc<Mutex<ImportProgressState>>,
+    pub sync_state: Arc<Mutex<SyncProgressState>>,
 }
 
 impl RustCalApp {
@@ -99,6 +109,7 @@ impl RustCalApp {
             todo_draft: None,
             calendar_draft: None,
             theme,
+            sync_mode: SyncMode::Merge,
             sync_config: SyncAccountConfig {
                 provider: "CalDAV".into(),
                 server_url: "https://caldav.example.com/dav/".into(),
@@ -111,6 +122,11 @@ impl RustCalApp {
                 stage: String::new(),
                 current: 0,
                 total: 0,
+                finished_message: None,
+            })),
+            sync_state: Arc::new(Mutex::new(SyncProgressState {
+                active: false,
+                stage: String::new(),
                 finished_message: None,
             })),
         }
@@ -143,8 +159,91 @@ impl RustCalApp {
         snapshot
     }
 
+    pub fn is_syncing(&self) -> bool {
+        self.sync_state.lock().map(|s| s.active).unwrap_or(false)
+    }
+
+    /// Run all CalDAV network and database work on a worker thread. The GUI thread
+    /// only polls the result and reloads its view after the worker has finished.
+    pub fn start_async_caldav_sync(&mut self, ctx: egui::Context) {
+        if self.is_syncing() || self.is_importing() {
+            return;
+        }
+        let cfg = self.sync_config.clone();
+        let mode = self.sync_mode;
+        let calendars = self.calendars.clone();
+        let events = self.events.clone();
+        let todos = self.todos.clone();
+        let state = Arc::clone(&self.sync_state);
+        if let Ok(mut s) = state.lock() {
+            s.active = true;
+            s.stage = format!("正在执行{}，网络请求在后台运行…", mode.label());
+            s.finished_message = None;
+        }
+        self.status_message = format!("CalDAV：正在执行{}…", mode.label());
+        ctx.request_repaint();
+
+        std::thread::spawn(move || {
+            let result = (|| -> anyhow::Result<String> {
+                // A dedicated SQLite connection avoids sharing rusqlite::Connection
+                // across threads and keeps the egui event loop responsive.
+                let mut worker_db = Database::open()?;
+                SyncEngine::sync_with_mode(
+                    &cfg, &mut worker_db, &calendars, &events, &todos, mode,
+                )
+            })();
+            if let Ok(mut s) = state.lock() {
+                s.active = false;
+                s.stage.clear();
+                s.finished_message = Some(match result {
+                    Ok(summary) => format!("✅ 同步成功：{}", summary),
+                    Err(e) => format!("❌ 同步失败：{}", e),
+                });
+            }
+            ctx.request_repaint();
+        });
+    }
+
+    /// Test the server connection in the worker too; even a slow DNS/TLS handshake
+    /// must never block the egui event loop.
+    pub fn start_async_connection_test(&mut self, ctx: egui::Context) {
+        if self.is_syncing() || self.is_importing() {
+            return;
+        }
+        let cfg = self.sync_config.clone();
+        let state = Arc::clone(&self.sync_state);
+        if let Ok(mut s) = state.lock() {
+            s.active = true;
+            s.stage = "正在后台测试 CalDAV 连接…".into();
+            s.finished_message = None;
+        }
+        self.status_message = "CalDAV：正在后台测试连接…".into();
+        ctx.request_repaint();
+        std::thread::spawn(move || {
+            let result = SyncEngine::test_connection(&cfg);
+            if let Ok(mut s) = state.lock() {
+                s.active = false;
+                s.stage.clear();
+                s.finished_message = Some(match result {
+                    Ok(msg) => format!("✅ 连接成功：{}", msg),
+                    Err(e) => format!("❌ 连接失败：{}", e),
+                });
+            }
+            ctx.request_repaint();
+        });
+    }
+
+    /// Consume worker completion on the UI thread and refresh visible records.
+    pub fn poll_sync_result(&mut self) {
+        let finished = self.sync_state.lock().ok().and_then(|mut s| s.finished_message.take());
+        if let Some(message) = finished {
+            self.status_message = message;
+            self.reload_all();
+        }
+    }
+
     pub fn start_async_ics_import(&mut self, path: PathBuf, ctx: egui::Context) {
-        if self.is_importing() {
+        if self.is_importing() || self.is_syncing() {
             return;
         }
         let default_cal = self.default_calendar_id();
@@ -220,7 +319,7 @@ impl RustCalApp {
     }
 
     pub fn start_async_json_import(&mut self, path: PathBuf, ctx: egui::Context) {
-        if self.is_importing() {
+        if self.is_importing() || self.is_syncing() {
             return;
         }
         let state_arc = Arc::clone(&self.import_state);
@@ -404,26 +503,31 @@ impl RustCalApp {
     }
 
     pub fn save_event(&mut self, ev: Event) {
+        if self.is_syncing() { self.status_message = "同步进行中，请稍后再修改日程".into(); return; }
         let _ = self.db.upsert_event(&ev);
         self.reload_all();
     }
 
     pub fn remove_event(&mut self, id: &str) {
+        if self.is_syncing() { self.status_message = "同步进行中，请稍后再删除日程".into(); return; }
         let _ = self.db.delete_event(id);
         self.reload_all();
     }
 
     pub fn save_todo(&mut self, td: Todo) {
+        if self.is_syncing() { self.status_message = "同步进行中，请稍后再修改任务".into(); return; }
         let _ = self.db.upsert_todo(&td);
         self.reload_all();
     }
 
     pub fn remove_todo(&mut self, id: &str) {
+        if self.is_syncing() { self.status_message = "同步进行中，请稍后再删除任务".into(); return; }
         let _ = self.db.delete_todo(id);
         self.reload_all();
     }
 
     pub fn save_calendar(&mut self, cal: Calendar) {
+        if self.is_syncing() { self.status_message = "同步进行中，请稍后再修改日历".into(); return; }
         let _ = self.db.upsert_calendar(&cal);
         self.reload_all();
     }
@@ -472,6 +576,10 @@ fn handle_shortcuts(&mut self, ctx: &egui::Context) {
 
 impl eframe::App for RustCalApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.poll_sync_result();
+        if self.is_syncing() {
+            ctx.request_repaint_after(StdDuration::from_millis(180));
+        }
         self.apply_theme_visuals(ctx);
 
         let fg_color = parse_hex_color(&self.theme.fg_color);

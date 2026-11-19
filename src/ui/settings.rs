@@ -1,7 +1,7 @@
 use crate::app::RustCalApp;
 use crate::db::Database;
 use crate::models::ThemeConfig;
-use crate::sync::caldav::SyncEngine;
+use crate::sync::caldav::SyncMode;
 use crate::sync::ical;
 use crate::ui::{color_to_hex, parse_hex_color};
 use eframe::egui::{self, Color32, RichText};
@@ -220,35 +220,41 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
                 ui.end_row();
             });
 
+        ui.label(RichText::new("同步模式（点击选择）:").strong().color(fg_color));
+        ui.horizontal_wrapped(|ui| {
+            ui.selectable_value(&mut app.sync_mode, SyncMode::Merge, "⇄ 双向合并（默认）");
+            ui.selectable_value(&mut app.sync_mode, SyncMode::LocalToCloud, "↑ 本机 → 云端");
+            ui.selectable_value(&mut app.sync_mode, SyncMode::CloudToLocal, "↓ 云端 → 本机");
+        });
+        ui.label(RichText::new("首次同步仅合并/创建，不推断删除；完成首次基线后，才会传播明确的新增、修改和删除。单向模式以所选来源为准。并发修改会保留为独立冲突副本。")
+            .small().color(fg_color));
         ui.horizontal(|ui| {
-            if ui.button("🔌 测试连接").clicked() {
-                match SyncEngine::test_connection(&app.sync_config) {
-                    Ok(msg) => {
-                        app.status_message = format!("✅ 连接成功：{}", msg);
-                    }
-                    Err(e) => {
-                        app.status_message = format!("❌ 连接失败：{}", e);
-                    }
-                }
+            let busy = app.is_syncing() || app.is_importing();
+            let test_button = ui.add_enabled(!busy, egui::Button::new("🔌 后台测试连接"));
+            if test_button.clicked() {
+                app.start_async_connection_test(ui.ctx().clone());
             }
-            if ui.button("🔄 立即同步所有已启用日历").clicked() {
-                match SyncEngine::sync_all(
-                    &app.sync_config,
-                    &mut app.db,
-                    &app.calendars,
-                    &app.events,
-                    &app.todos,
-                ) {
-                    Ok(summary) => {
-                        app.reload_all();
-                        app.status_message = format!("✅ 同步成功：{}", summary);
-                    }
-                    Err(e) => {
-                        app.status_message = format!("❌ 同步失败：{}", e);
-                    }
-                }
+            let sync_button = ui.add_enabled(
+                !busy,
+                egui::Button::new("🔄 立即同步（后台执行）"),
+            );
+            if sync_button.clicked() {
+                app.start_async_caldav_sync(ui.ctx().clone());
             }
         });
+        if let Ok(state) = app.sync_state.lock() {
+            if state.active {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    let message = if state.stage.is_empty() {
+                        "后台任务正在运行，界面仍可正常操作…".to_string()
+                    } else {
+                        state.stage.clone()
+                    };
+                    ui.label(message);
+                });
+            }
+        }
 
         ui.separator();
         ui.heading(RichText::new("⌨ 键盘快捷键指南 (Calcurse 效率流)").color(fg_color));
