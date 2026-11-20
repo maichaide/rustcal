@@ -7,6 +7,8 @@ description = "A modern cross-platform GUI replacement for calcurse built with R
 [dependencies]
 eframe = "0.29.1"
 egui = "0.29.1"
+egui_extras = { version = "0.29.1", features = ["image"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 chrono = { version = "0.4.38", features = ["serde"] }
 uuid = { version = "1.11.0", features = ["v4", "serde"] }
@@ -19,4 +21,3 @@ quick-xml = "0.41.0"
 encoding_rs = "0.8.35"
 chardetng = "0.1.17"
 ureq = "2.10"
-

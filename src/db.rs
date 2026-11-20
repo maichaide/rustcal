@@ -41,6 +41,14 @@ impl Database {
         }
     }
 
+    pub fn sync_config_path() -> PathBuf {
+        if let Some(proj_dirs) = ProjectDirs::from("io", "rustcal", "RustCal") {
+            proj_dirs.config_dir().join("sync_config.json")
+        } else {
+            PathBuf::from("sync_config.json")
+        }
+    }
+
     fn init_schema(&self) -> Result<()> {
         self.conn.execute_batch(
             "

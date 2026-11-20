@@ -9,9 +9,17 @@ use crate::ui::{
 };
 use chrono::{Duration, Local, NaiveDate};
 use eframe::egui::{self, Color32, Key, RichText};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration as StdDuration;
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct PersistedSyncConfig {
+    provider: String,
+    server_url: String,
+    username: String,
+}
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 pub enum MainTab {
@@ -86,6 +94,7 @@ impl RustCalApp {
         let events = db.list_events().unwrap_or_default();
         let todos = db.list_todos().unwrap_or_default();
         let theme = Self::load_theme();
+        let sync_config = Self::load_sync_config();
 
         let init_msg = if cjk_font_loaded {
             "本地离线数据库与中文字体已就绪".into()
@@ -110,12 +119,7 @@ impl RustCalApp {
             calendar_draft: None,
             theme,
             sync_mode: SyncMode::Merge,
-            sync_config: SyncAccountConfig {
-                provider: "CalDAV".into(),
-                server_url: "https://caldav.example.com/dav/".into(),
-                username: String::new(),
-                token_or_password: String::new(),
-            },
+            sync_config,
             status_message: init_msg,
             import_state: Arc::new(Mutex::new(ImportProgressState {
                 active: false,
@@ -391,6 +395,55 @@ impl RustCalApp {
         }
     }
 
+    fn load_sync_config() -> SyncAccountConfig {
+        let default_cfg = SyncAccountConfig {
+            provider: "CalDAV".into(),
+            server_url: "https://caldav.example.com/dav/".into(),
+            username: String::new(),
+            token_or_password: String::new(),
+        };
+        let path = Database::sync_config_path();
+        if let Ok(raw) = std::fs::read_to_string(path) {
+            if let Ok(saved) = serde_json::from_str::<PersistedSyncConfig>(&raw) {
+                return SyncAccountConfig {
+                    provider: if saved.provider.is_empty() {
+                        "CalDAV".into()
+                    } else {
+                        saved.provider
+                    },
+                    server_url: saved.server_url,
+                    username: saved.username,
+                    token_or_password: String::new(),
+                };
+            }
+        }
+        default_cfg
+    }
+
+    pub fn save_sync_config(&self) {
+        let path = Database::sync_config_path();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let persisted = PersistedSyncConfig {
+            provider: self.sync_config.provider.clone(),
+            server_url: self.sync_config.server_url.clone(),
+            username: self.sync_config.username.clone(),
+        };
+        if let Ok(json) = serde_json::to_string_pretty(&persisted) {
+            let _ = std::fs::write(path, json);
+        }
+    }
+
+    pub fn clear_sync_config(&mut self) {
+        self.sync_config.server_url.clear();
+        self.sync_config.username.clear();
+        self.sync_config.token_or_password.clear();
+        let path = Database::sync_config_path();
+        let _ = std::fs::remove_file(path);
+        self.status_message = "✅ 已清空保存的同步服务器与账号配置".into();
+    }
+
     fn apply_theme_visuals(&self, ctx: &egui::Context) {
         let bg = parse_hex_color(&self.theme.bg_color);
         let fg = parse_hex_color(&self.theme.fg_color);
@@ -532,7 +585,7 @@ impl RustCalApp {
         self.reload_all();
     }
 
-fn handle_shortcuts(&mut self, ctx: &egui::Context) {
+    fn handle_shortcuts(&mut self, ctx: &egui::Context) {
         // 1. 若有输入框持有焦点、输入法正在组合拼音、或有弹窗打开，直接跳过单键快捷键
         if ctx.wants_keyboard_input()
             || self.event_draft.is_some()

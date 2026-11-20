@@ -22,6 +22,7 @@ fn main() -> Result<(), eframe::Error> {
         "RustCal",
         options,
         Box::new(|cc| {
+            egui_extras::install_image_loaders(&cc.egui_ctx);
             let font_loaded = setup_fonts(&cc.egui_ctx);
             Ok(Box::new(RustCalApp::new(cc, font_loaded)))
         }),

@@ -122,7 +122,6 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
                 }
             }
 
-
             if ui.button("📤 导出为 .ics (UTF-8 标准)").clicked() {
                 if let Some(path) = rfd::FileDialog::new()
                     .set_file_name("rustcal_export.ics")
@@ -178,6 +177,7 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
         ui.separator();
         ui.heading(RichText::new("☁ 云端日历同步与协作（CalDAV和WebDAV）").color(fg_color));
 
+        let mut sync_field_changed = false;
         egui::Grid::new("sync_account_grid")
             .num_columns(2)
             .spacing([12.0, 8.0])
@@ -187,17 +187,26 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
                     .selected_text(&app.sync_config.provider)
                     .show_ui(ui, |ui| {
                         for p in ["CalDAV", "WebDAV"] {
-                            ui.selectable_value(&mut app.sync_config.provider, p.into(), p);
+                            if ui
+                                .selectable_value(&mut app.sync_config.provider, p.into(), p)
+                                .changed()
+                            {
+                                sync_field_changed = true;
+                            }
                         }
                     });
                 ui.end_row();
 
                 ui.label(RichText::new("服务器 / Endpoint URL:").color(fg_color));
-                ui.text_edit_singleline(&mut app.sync_config.server_url);
+                if ui.text_edit_singleline(&mut app.sync_config.server_url).changed() {
+                    sync_field_changed = true;
+                }
                 ui.end_row();
 
                 ui.label(RichText::new("账号 / Client ID:").color(fg_color));
-                ui.text_edit_singleline(&mut app.sync_config.username);
+                if ui.text_edit_singleline(&mut app.sync_config.username).changed() {
+                    sync_field_changed = true;
+                }
                 ui.end_row();
 
                 ui.label(RichText::new("密码 / OAuth Token:").color(fg_color));
@@ -207,6 +216,9 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
                 );
                 ui.end_row();
             });
+        if sync_field_changed {
+            app.save_sync_config();
+        }
 
         ui.label(RichText::new("同步模式（点击选择）:").strong().color(fg_color));
         ui.horizontal_wrapped(|ui| {
@@ -214,20 +226,25 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
             ui.selectable_value(&mut app.sync_mode, SyncMode::LocalToCloud, "↑ 本机 → 云端");
             ui.selectable_value(&mut app.sync_mode, SyncMode::CloudToLocal, "↓ 云端 → 本机");
         });
-        ui.label(RichText::new("首次同步仅合并/创建，不推断删除；首次基线后，才新增、修改和删除。单向模式以所选来源为准。并发修改会保留为独立冲突副本。")
-            .small().color(fg_color));
+        ui.label(
+            RichText::new(
+                "首次同步仅合并/创建，不推断删除；首次基线后，才新增、修改和删除。单向模式以所选来源为准。并发修改会保留为独立冲突副本。",
+            )
+            .small()
+            .color(fg_color),
+        );
         ui.horizontal(|ui| {
             let busy = app.is_syncing() || app.is_importing();
             let test_button = ui.add_enabled(!busy, egui::Button::new("🔌 后台测试连接"));
             if test_button.clicked() {
                 app.start_async_connection_test(ui.ctx().clone());
             }
-            let sync_button = ui.add_enabled(
-                !busy,
-                egui::Button::new("🔄 立即同步（后台执行）"),
-            );
+            let sync_button = ui.add_enabled(!busy, egui::Button::new("🔄 立即同步（后台执行）"));
             if sync_button.clicked() {
                 app.start_async_caldav_sync(ui.ctx().clone());
+            }
+            if ui.button("🗑 清空同步配置").clicked() {
+                app.clear_sync_config();
             }
         });
         if let Ok(state) = app.sync_state.lock() {
@@ -245,32 +262,52 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
         }
 
         ui.separator();
-        ui.heading(RichText::new("⌨ 键盘快捷键指南 (Calcurse 效率流)").color(fg_color));
-        ui.label(
-            RichText::new("• 1 / 2 / 3   : 切换 日历 / 任务 / 设置与同步")
-                .monospace()
-                .color(fg_color),
-        );
-        ui.label(
-            RichText::new("• T           : 迅速跳转回今天")
-                .monospace()
-                .color(fg_color),
-        );
-        ui.label(
-            RichText::new("• N           : 新建日程 (Appointment)")
-                .monospace()
-                .color(fg_color),
-        );
-        ui.label(
-            RichText::new("• Shift + N   : 新建任务 (Todo)")
-                .monospace()
-                .color(fg_color),
-        );
-        ui.label(
-            RichText::new("• /           : 聚焦全局搜索框")
-                .monospace()
-                .color(fg_color),
-        );
+        ui.horizontal_top(|ui| {
+            ui.vertical(|ui| {
+                ui.heading(RichText::new("⌨ 键盘快捷键指南 (Calcurse 效率流)").color(fg_color));
+                ui.label(
+                    RichText::new("• 1 / 2 / 3   : 切换 日历 / 任务 / 设置与同步")
+                        .monospace()
+                        .color(fg_color),
+                );
+                ui.label(
+                    RichText::new("• T           : 迅速跳转回今天")
+                        .monospace()
+                        .color(fg_color),
+                );
+                ui.label(
+                    RichText::new("• N           : 新建日程 (Appointment)")
+                        .monospace()
+                        .color(fg_color),
+                );
+                ui.label(
+                    RichText::new("• Shift + N   : 新建任务 (Todo)")
+                        .monospace()
+                        .color(fg_color),
+                );
+                ui.label(
+                    RichText::new("• /           : 聚焦全局搜索框")
+                        .monospace()
+                        .color(fg_color),
+                );
+            });
+
+            #[cfg(has_donate_qr)]
+            {
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::BOTTOM), |ui| {
+                    let ppp = ui.ctx().pixels_per_point().max(0.5);
+                    let cm_3_px = 3.0_f32 / 2.54_f32 * 96.0_f32;
+                    let side_points = cm_3_px / ppp;
+                    let bytes: &'static [u8] =
+                        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/assets/donate_qr.png"));
+                    ui.add(
+                        egui::Image::from_bytes("bytes://donate_qr.png", bytes)
+                            .fit_to_exact_size(egui::vec2(side_points, side_points))
+                            .maintain_aspect_ratio(false),
+                    );
+                });
+            }
+        });
 
         if !app.status_message.is_empty() {
             ui.add_space(10.0);
