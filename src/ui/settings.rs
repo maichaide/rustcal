@@ -98,7 +98,7 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
         });
 
         ui.separator();
-        ui.heading(RichText::new("🔄 数据导入 / 导出与全量备份 (异步高性能导入 + 进度条)").color(fg_color));
+        ui.heading(RichText::new("🔄 数据导入 / 导出与全量备份 ").color(fg_color));
         ui.label(
             RichText::new(format!(
                 "本地 SQLite 数据库路径: {}",
@@ -111,7 +111,7 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             let import_btn = ui.add_enabled(
                 !is_importing,
-                egui::Button::new("📥 导入 .ics (支持数千条高速批量导入 + 中文/多编码)"),
+                egui::Button::new("📥 导入 .ics "),
             );
             if import_btn.clicked() {
                 if let Some(path) = rfd::FileDialog::new()
@@ -122,18 +122,6 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
                 }
             }
 
-            if ui.button("📤 导出为 .ics (UTF-8 标准)").clicked() {
-                if let Some(path) = rfd::FileDialog::new()
-                    .set_file_name("rustcal_export.ics")
-                    .save_file()
-                {
-                    let content = ical::export_to_ics(&app.events, &app.todos);
-                    match std::fs::write(&path, content) {
-                        Ok(_) => app.status_message = format!("✅ 已导出 ICS 至 {}", path.display()),
-                        Err(e) => app.status_message = format!("❌ 导出失败: {}", e),
-                    }
-                }
-            }
 
             if ui.button("📤 导出为 .ics (UTF-8 标准)").clicked() {
                 if let Some(path) = rfd::FileDialog::new()
@@ -226,7 +214,7 @@ pub fn render_sync_and_settings(app: &mut RustCalApp, ui: &mut egui::Ui) {
             ui.selectable_value(&mut app.sync_mode, SyncMode::LocalToCloud, "↑ 本机 → 云端");
             ui.selectable_value(&mut app.sync_mode, SyncMode::CloudToLocal, "↓ 云端 → 本机");
         });
-        ui.label(RichText::new("首次同步仅合并/创建，不推断删除；完成首次基线后，才会传播明确的新增、修改和删除。单向模式以所选来源为准。并发修改会保留为独立冲突副本。")
+        ui.label(RichText::new("首次同步仅合并/创建，不推断删除；首次基线后，才新增、修改和删除。单向模式以所选来源为准。并发修改会保留为独立冲突副本。")
             .small().color(fg_color));
         ui.horizontal(|ui| {
             let busy = app.is_syncing() || app.is_importing();
