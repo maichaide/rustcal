@@ -3,6 +3,7 @@ use crate::models::{Event, EventUrgency};
 use crate::ui::parse_hex_color;
 use chrono::{Datelike, Duration, Local, NaiveDate, Timelike};
 use eframe::egui::{self, Color32, RichText, Stroke};
+use lunar_lite::{solar_to_lunar, SolarDate};
 
 pub fn render_calendar_workspace(app: &mut RustCalApp, ui: &mut egui::Ui) {
     let fg_color = parse_hex_color(&app.theme.fg_color);
@@ -30,6 +31,9 @@ pub fn render_calendar_workspace(app: &mut RustCalApp, ui: &mut egui::Ui) {
             ))
             .color(fg_color),
         );
+        if let Some(lunar_text) = lunar_date_text(app.selected_date) {
+            ui.label(RichText::new(lunar_text).size(12.0).color(Color32::from_rgb(180, 83, 9)));
+        }
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if ui.button("➕ 新建日程 (N)").clicked() {
@@ -233,7 +237,19 @@ fn render_month_grid(app: &mut RustCalApp, ui: &mut egui::Ui) {
                                 app.selected_date = cell_date;
                             }
 
-                            ui.add_space(2.0);
+                            if let Some(lunar_text) = lunar_date_text(cell_date) {
+                                ui.label(
+                                    RichText::new(lunar_text)
+                                        .size(9.5)
+                                        .color(if is_current_month {
+                                            Color32::from_rgb(180, 83, 9)
+                                        } else {
+                                            Color32::from_rgba_unmultiplied(180, 83, 9, 105)
+                                        }),
+                                );
+                            }
+
+                            ui.add_space(1.0);
 
                             // 仅以对应紧急程度色条标识日程
                             for ev in day_events.iter().take(4) {
@@ -276,6 +292,9 @@ fn render_week_view(app: &mut RustCalApp, ui: &mut egui::Ui) {
             {
                 app.selected_date = d;
             }
+            if let Some(lunar_text) = lunar_date_text(d) {
+                ui.label(RichText::new(format!("  {}", lunar_text)).size(11.0).color(Color32::from_rgb(180, 83, 9)));
+            }
         });
         let evs = app.visible_events_on(d);
         if evs.is_empty() {
@@ -302,6 +321,9 @@ fn render_week_view(app: &mut RustCalApp, ui: &mut egui::Ui) {
 fn render_day_timeline(app: &mut RustCalApp, ui: &mut egui::Ui) {
     let fg_color = parse_hex_color(&app.theme.fg_color);
     ui.heading(RichText::new(format!("{} 时间轴", app.selected_date)).color(fg_color));
+    if let Some(lunar_text) = lunar_date_text(app.selected_date) {
+        ui.label(RichText::new(lunar_text).size(12.0).color(Color32::from_rgb(180, 83, 9)));
+    }
     let evs = app.visible_events_on(app.selected_date);
 
     let all_day: Vec<&Event> = evs.iter().filter(|e| e.is_all_day).collect();
@@ -550,6 +572,9 @@ fn render_selected_day_inspector(app: &mut RustCalApp, ui: &mut egui::Ui) {
         ui.heading(
             RichText::new(format!("📋 {} 日程详情与冲突检查", app.selected_date)).color(fg_color),
         );
+        if let Some(lunar_text) = lunar_date_text(app.selected_date) {
+            ui.label(RichText::new(lunar_text).size(12.0).color(Color32::from_rgb(180, 83, 9)));
+        }
     });
     ui.separator();
 
@@ -663,6 +688,36 @@ fn render_selected_day_inspector(app: &mut RustCalApp, ui: &mut egui::Ui) {
     }
     if let Some(id) = delete_id {
         app.remove_event(&id);
+    }
+}
+
+/// 将公历日期转换为农历日期显示文本。超出算法支持范围时不显示农历。
+fn lunar_date_text(date: NaiveDate) -> Option<String> {
+    let lunar = solar_to_lunar(SolarDate {
+        year: date.year(),
+        month: date.month() as u8,
+        day: date.day() as u8,
+    })
+    .ok()?;
+
+    const MONTH_NAMES: [&str; 12] = [
+        "正月", "二月", "三月", "四月", "五月", "六月", "七月", "八月", "九月", "十月", "冬月", "腊月",
+    ];
+    const DAY_NAMES: [&str; 31] = [
+        "", "初一", "初二", "初三", "初四", "初五", "初六", "初七", "初八", "初九", "初十",
+        "十一", "十二", "十三", "十四", "十五", "十六", "十七", "十八", "十九", "二十",
+        "廿一", "廿二", "廿三", "廿四", "廿五", "廿六", "廿七", "廿八", "廿九", "三十",
+    ];
+
+    let month_index = usize::from(lunar.month.saturating_sub(1));
+    let day_index = usize::from(lunar.day);
+    let month_name = MONTH_NAMES.get(month_index)?;
+    let day_name = DAY_NAMES.get(day_index)?;
+
+    if lunar.day == 1 {
+        Some(format!("{}{}", if lunar.is_leap_month { "闰" } else { "" }, month_name))
+    } else {
+        Some((*day_name).to_owned())
     }
 }
 
